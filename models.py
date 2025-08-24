@@ -9,3 +9,5 @@ class VideoDocument(BaseModel):
     file_size: int = Field(..., description="Size in bytes")
     caption: str | None = Field(None, description="Optional caption")
     date_uploaded: datetime = Field(..., description="Telegram message date")
+    channel_title: str | None = Field(None, description="Channel name")
+    duration: int | None = Field(None, description="Video duration in seconds")
