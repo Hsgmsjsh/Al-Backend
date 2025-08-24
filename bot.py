@@ -4,7 +4,12 @@ import tempfile
 import logging
 from datetime import datetime
 from telegram import Update, Bot
-from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 from database import save_video_document, fs_bucket, get_videos_count
 from utils import download_video, get_builtin_thumbnail, generate_thumbnail, cleanup_temp_files
 from logging_config import setup_logging
@@ -14,8 +19,12 @@ logger = setup_logging()
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
+
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle incoming video messages from the channel."""
+    video_path = None
+    thumb_path = None
+
     try:
         message = update.effective_message
         chat = message.chat
@@ -44,9 +53,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # Thumbnail handling
         thumb_file_id = get_builtin_thumbnail(video)
-        video_path = None
-        thumb_path = None
-
         if thumb_file_id:
             logger.info("Using built-in Telegram thumbnail")
             thumb_file = context.bot.get_file(thumb_file_id)
@@ -66,8 +72,8 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 metadata={
                     "source": "built_in" if thumb_file_id else "generated",
                     "video_file_id": file_id,
-                    "created_at": datetime.utcnow()
-                }
+                    "created_at": datetime.utcnow(),
+                },
             )
         thumbnail_grid_id = str(grid_id)
         logger.info(f"Thumbnail stored in GridFS with ID: {thumbnail_grid_id}")
@@ -82,44 +88,56 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "caption": caption,
             "date_uploaded": date_uploaded,
             "channel_title": channel_title,
-            "duration": duration
+            "duration": duration,
         }
 
         # Save document to MongoDB
         document_id = await save_video_document(doc)
 
-        # Notify in logs and optionally via bot message
+        # Notify in channel
         total_videos = await get_videos_count()
-        logger.info("="*60)
+        logger.info("=" * 60)
         logger.info(f"✅ Video saved! ID: {document_id}")
         logger.info(f"Total videos in DB: {total_videos}")
         await context.bot.send_message(
             chat_id=chat.id,
-            text=f"📥 Video indexed: {file_id}\nTotal videos: {total_videos}"
+            text=f"📥 Video indexed: {file_id}\nTotal videos: {total_videos}",
         )
         logger.info("Notification message sent to channel")
 
     except Exception as e:
         logger.error(f"Error processing video: {e}", exc_info=True)
-
     finally:
-        # Cleanup temp files
         cleanup_temp_files(video_path, thumb_path)
+
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Bot error: {context.error}", exc_info=True)
 
+
 async def main_bot():
-    """Start Telegram bot polling."""
+    """Initialize, start, and run the Telegram bot asynchronously."""
     logger.info("Starting Telegram bot...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(MessageHandler(filters.VIDEO, handle_video))
     app.add_error_handler(error_handler)
+
+    # Proper initialization before starting
+    await app.initialize()
     await app.start()
     await app.updater.start_polling(drop_pending_updates=True)
-    logger.info("Telegram bot is polling updates")
-    await asyncio.Event().wait()  # Keep running indefinitely
+    logger.info("Telegram bot is now polling for updates")
+
+    # Keep the bot running
+    try:
+        await asyncio.Event().wait()
+    finally:
+        logger.info("Shutting down Telegram bot...")
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
+
 
 if __name__ == "__main__":
     asyncio.run(main_bot())
-                    
+    
