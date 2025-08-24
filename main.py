@@ -1,4 +1,4 @@
- import os
+import os
 import logging
 import asyncio
 from datetime import datetime
@@ -20,7 +20,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,7 +30,6 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Application startup: log status, start Telegram bot."""
     logger.info("🚀 FastAPI application starting up...")
     try:
         count = await get_videos_count()
@@ -39,7 +37,6 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Failed to fetch video count on startup: {e}")
 
-    # Start Telegram bot polling in background
     logger.info("🤖 Starting Telegram bot as background task...")
     asyncio.create_task(main_bot())
     logger.info("✅ Telegram bot background task scheduled")
@@ -47,7 +44,6 @@ async def startup_event():
 
 @app.get("/", response_model=HealthResponse)
 async def root():
-    """Health check endpoint."""
     try:
         videos_count = await get_videos_count()
         response = HealthResponse(
@@ -64,7 +60,6 @@ async def root():
 
 @app.get("/videos", response_model=list[VideoOut])
 async def list_videos(limit: int = 50, skip: int = 0):
-    """List indexed videos with pagination."""
     try:
         logger.info(f"📋 Fetching videos - limit: {limit}, skip: {skip}")
         videos = []
@@ -90,7 +85,6 @@ async def list_videos(limit: int = 50, skip: int = 0):
 
 @app.get("/thumbnail/{file_id}")
 async def get_thumbnail(file_id: str):
-    """Serve thumbnail image from GridFS."""
     try:
         logger.debug(f"🖼️ Serving thumbnail: {file_id}")
         grid_out = await fs_bucket.open_download_stream(ObjectId(file_id))
@@ -105,7 +99,6 @@ async def get_thumbnail(file_id: str):
 
 @app.get("/video/{file_id}", response_model=VideoOut)
 async def get_video_info(file_id: str):
-    """Get detailed information about a specific video."""
     try:
         logger.info(f"🎥 Fetching video info: {file_id}")
         doc = await videos_collection.find_one({"file_id": file_id})
@@ -135,4 +128,3 @@ async def get_video_info(file_id: str):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-               
