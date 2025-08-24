@@ -3,7 +3,7 @@ import asyncio
 import tempfile
 import logging
 from datetime import datetime
-from telegram import Update, Bot
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     ContextTypes,
@@ -16,12 +16,12 @@ from logging_config import setup_logging
 
 logger = setup_logging()
 
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+# Expected numeric channel ID (use -100... format for channels)
+CHANNEL_ID_INT = int(os.getenv("CHANNEL_ID_INT"))
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 
 async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle incoming video messages from the channel."""
     video_path = None
     thumb_path = None
 
@@ -29,9 +29,11 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = update.effective_message
         chat = message.chat
 
-        logger.info(f"Received message in chat: {chat.title} (@{chat.username})")
-        if chat.username != CHANNEL_ID.lstrip("@"):
-            logger.debug("Ignoring message from non-target channel")
+        logger.info(f"Received message from chat.id={chat.id}, title={chat.title}")
+
+        # Only process messages from the specified channel ID
+        if chat.id != CHANNEL_ID_INT:
+            logger.debug(f"Ignoring message from non-target chat: {chat.id}")
             return
 
         video = message.video
@@ -47,7 +49,6 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         duration = video.duration
         date_uploaded = datetime.fromtimestamp(message.date.timestamp())
         caption = message.caption
-        channel_title = chat.title
 
         logger.info(f"Processing video: file_id={file_id}, duration={duration}s, size={file_size} bytes")
 
@@ -87,21 +88,18 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "file_size": file_size,
             "caption": caption,
             "date_uploaded": date_uploaded,
-            "channel_title": channel_title,
             "duration": duration,
         }
 
         # Save document to MongoDB
         document_id = await save_video_document(doc)
 
-        # Notify in channel
+        # Notify channel
         total_videos = await get_videos_count()
-        logger.info("=" * 60)
-        logger.info(f"✅ Video saved! ID: {document_id}")
-        logger.info(f"Total videos in DB: {total_videos}")
+        logger.info(f"✅ Video saved! Document ID: {document_id}, Total in DB: {total_videos}")
         await context.bot.send_message(
-            chat_id=chat.id,
-            text=f"📥 Video indexed: {file_id}\nTotal videos: {total_videos}",
+            chat_id=CHANNEL_ID_INT,
+            text=f"📥 Indexed video {file_id}\nTotal indexed videos: {total_videos}"
         )
         logger.info("Notification message sent to channel")
 
@@ -140,4 +138,4 @@ async def main_bot():
 
 if __name__ == "__main__":
     asyncio.run(main_bot())
-    
+                
