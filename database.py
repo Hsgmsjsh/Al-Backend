@@ -1,12 +1,11 @@
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
-from gridfs.asyncio import AsyncIOMotorGridFSBucket
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorGridFSBucket
 from dotenv import load_dotenv
 
 load_dotenv()
 
 MONGODB_URI = os.getenv("MONGODB_URI")
-DB_NAME = MONGODB_URI.rsplit("/", 1)[-1]
+DB_NAME = "telegram_videos"  # Replace with your actual database name if different
 
 client = AsyncIOMotorClient(MONGODB_URI)
 db = client[DB_NAME]
