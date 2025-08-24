@@ -5,4 +5,3 @@ motor
 pymongo
 python-dotenv
 ffmpeg-python
-gridfs
