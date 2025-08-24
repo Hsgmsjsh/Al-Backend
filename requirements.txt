@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-telegram-bot==13.15
+motor
+pymongo
+python-dotenv
+ffmpeg-python
+gridfs
